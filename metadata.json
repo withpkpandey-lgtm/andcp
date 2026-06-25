@@ -1,0 +1,8 @@
+{
+  "name": "WhatsApp Python Tutor",
+  "description": "An interactive, AI-powered personal programming teacher designed like WhatsApp. Learn Python from zero level with Hinglish explanations, topic-wise paths, code debugging, line-by-line analysis, quizzes, progress tracking, and real-world science projects.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
