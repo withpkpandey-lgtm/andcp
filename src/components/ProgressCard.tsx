@@ -18,14 +18,16 @@ import {
   Layers, 
   Edit3, 
   CheckCircle2,
-  Lock
+  Lock,
+  Camera,
+  Upload
 } from 'lucide-react';
 import { StudentProgress, Topic } from '../types';
 
 interface ProgressCardProps {
   progress: StudentProgress;
   topics: Topic[];
-  onUpdateProfile: (name: string, roll: string, stream: 'B.pharm' | 'D.pharm' | '') => void;
+  onUpdateProfile: (name: string, roll: string, stream: 'B.pharm' | 'D.pharm' | '', profilePic?: string, pinCode?: string) => void;
   onNavigateToTopic: (topicId: string) => void;
 }
 
@@ -34,6 +36,8 @@ export default function ProgressCard({ progress, topics, onUpdateProfile, onNavi
   const [tempName, setTempName] = useState(progress.userName);
   const [tempRoll, setTempRoll] = useState(progress.rollNumber || '');
   const [tempStream, setTempStream] = useState<'B.pharm' | 'D.pharm' | ''>(progress.stream || 'B.pharm');
+  const [tempPic, setTempPic] = useState<string>(progress.profilePic || '');
+  const [tempPin, setTempPin] = useState<string>(progress.pinCode || '');
 
   const totalTopics = topics.length;
   const completedCount = progress.completedTopics.length;
@@ -49,7 +53,7 @@ export default function ProgressCard({ progress, topics, onUpdateProfile, onNavi
 
   const handleSaveProfile = () => {
     if (tempName.trim()) {
-      onUpdateProfile(tempName.trim(), tempRoll.trim(), tempStream);
+      onUpdateProfile(tempName.trim(), tempRoll.trim(), tempStream, tempPic, tempPin);
       setEditing(false);
     }
   };
@@ -67,9 +71,18 @@ export default function ProgressCard({ progress, topics, onUpdateProfile, onNavi
       <div className="bg-white rounded-3xl p-6 shadow-md border border-slate-200/60 transition-all duration-300">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-5 mb-5">
           <div className="flex items-center gap-3.5">
-            <div className="w-14 h-14 bg-gradient-to-tr from-indigo-600 to-indigo-800 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-md">
-              {progress.userName ? progress.userName.charAt(0).toUpperCase() : 'S'}
-            </div>
+            {progress.profilePic ? (
+              <img 
+                src={progress.profilePic} 
+                alt={progress.userName} 
+                referrerPolicy="no-referrer"
+                className="w-14 h-14 rounded-2xl object-cover shadow-md border border-slate-200"
+              />
+            ) : (
+              <div className="w-14 h-14 bg-gradient-to-tr from-indigo-600 to-indigo-800 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-md">
+                {progress.userName ? progress.userName.charAt(0).toUpperCase() : 'S'}
+              </div>
+            )}
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-extrabold text-slate-800 text-lg">{progress.userName}</h3>
@@ -89,6 +102,8 @@ export default function ProgressCard({ progress, topics, onUpdateProfile, onNavi
               setTempName(progress.userName);
               setTempRoll(progress.rollNumber || '');
               setTempStream(progress.stream || 'B.pharm');
+              setTempPic(progress.profilePic || '');
+              setTempPin(progress.pinCode || '');
               setEditing(!editing);
             }}
             className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50/50 hover:bg-indigo-50 px-3.5 py-2 rounded-xl transition-all cursor-pointer"
@@ -101,6 +116,57 @@ export default function ProgressCard({ progress, topics, onUpdateProfile, onNavi
         {/* Editing details settings panel */}
         {editing ? (
           <div className="bg-slate-50/70 rounded-2xl p-4 border border-slate-200/40 grid grid-cols-1 md:grid-cols-3 gap-4.5 animate-fadeIn">
+            
+            {/* Image Upload section */}
+            <div className="md:col-span-3 flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200/40 mb-1">
+              <div className="relative group">
+                {tempPic ? (
+                  <img src={tempPic} alt="Preview" className="w-16 h-16 rounded-2xl object-cover border border-slate-200" />
+                ) : (
+                  <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-200 border-dashed">
+                    <User className="w-6 h-6" />
+                  </div>
+                )}
+                <label htmlFor="edit-profile-pic" className="absolute -bottom-1.5 -right-1.5 bg-indigo-600 hover:bg-indigo-700 text-white p-1 rounded-lg cursor-pointer shadow-md transition-all">
+                  <Camera className="w-3.5 h-3.5" />
+                </label>
+              </div>
+              <div className="flex-1 text-center sm:text-left">
+                <p className="text-xs font-black text-slate-700">Upload Student Photo 📸</p>
+                <p className="text-[10px] text-slate-450 mt-0.5 font-bold">Apna photo computer ya mobile se add karein beta</p>
+                <div className="mt-2 flex items-center gap-2 justify-center sm:justify-start">
+                  <input 
+                    type="file" 
+                    id="edit-profile-pic" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setTempPic(reader.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                  <label htmlFor="edit-profile-pic" className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-extrabold rounded-lg cursor-pointer transition-all border border-slate-200">
+                    Choose Photo
+                  </label>
+                  {tempPic && (
+                    <button 
+                      type="button"
+                      onClick={() => setTempPic('')} 
+                      className="px-2.5 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-100 transition-all cursor-pointer"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div className="space-y-1.5">
               <label className="text-[10px] uppercase font-extrabold tracking-wider text-slate-450 block">Student Full Name</label>
               <input
@@ -134,6 +200,19 @@ export default function ProgressCard({ progress, topics, onUpdateProfile, onNavi
                 <option value="D.pharm">D.pharm (Diploma in Pharmacy)</option>
                 <option value="">General Python / Science</option>
               </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase font-extrabold tracking-wider text-rose-500 block">Security PIN (🔒 4-Digits)</label>
+              <input
+                type="text"
+                maxLength={4}
+                value={tempPin}
+                onChange={(e) => setTempPin(e.target.value.replace(/\D/g, ''))}
+                className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-rose-500 font-mono text-slate-800 font-extrabold tracking-widest text-center"
+                placeholder="Set 4-digit PIN (e.g. 1234)"
+              />
+              <p className="text-[9px] text-slate-400 font-semibold leading-tight">PIN lagane se aapka chat box safe ho jayega aur koi doosra switch nahi kar sakega beta.</p>
             </div>
 
             <div className="md:col-span-3 flex justify-end gap-2 pt-2 border-t border-slate-200/40">
@@ -270,36 +349,70 @@ export default function ProgressCard({ progress, topics, onUpdateProfile, onNavi
       {/* Certificate Panel */}
       <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 text-white rounded-3xl p-6 shadow-lg flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative">
         <div className="absolute right-0 top-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -z-10" />
-        <div className="space-y-2.5 max-w-xl">
-          <span className="bg-indigo-600/80 text-[9px] uppercase tracking-widest px-3 py-1 rounded-full font-extrabold border border-indigo-400/20">
-            Python Mastery Certificate
-          </span>
-          <h3 className="text-xl font-black tracking-tight">Aapka Certificate Ready Hai?</h3>
-          <p className="text-xs text-slate-300 leading-relaxed font-sans">
-            Syllabus ke saare 16 chapters complete karke quizzes solve kijiye. Jaise hi aapka 100% complete hoga, hamara system aapko <strong>Mr. Pawan Pandey</strong> (PyGuru AI Tutor) dwara signed verified certificate generate karke dega. Isko aap save karke print kar sakte hain!
-          </p>
-        </div>
-        <div className="shrink-0 flex flex-col items-center gap-2">
-          {isCompleted ? (
-            <button
-              onClick={handlePrintCertificate}
-              className="flex items-center gap-2 px-5.5 py-3.5 bg-indigo-600 text-white rounded-xl font-extrabold text-xs uppercase tracking-wider hover:bg-indigo-500 shadow-lg shadow-indigo-600/30 active:scale-95 transition-all cursor-pointer"
-            >
-              <Printer className="w-4 h-4" />
-              Print Certificate
-            </button>
-          ) : (
-            <div className="text-center bg-slate-800/40 border border-slate-700/40 p-4.5 rounded-2xl min-w-[120px]">
-              <div className="text-[10px] text-slate-400 uppercase font-extrabold tracking-wider mb-1">Your Progress</div>
-              <div className="text-4xl font-black text-indigo-400">{percentComplete}%</div>
-              <div className="text-[9px] text-slate-400 mt-1.5 uppercase font-semibold">Need 100% to print</div>
+        {progress.approvalStatus !== 'approved' || progress.certAllowed === false ? (
+          <>
+            <div className="space-y-2.5 max-w-xl">
+              <span className="bg-rose-500/80 text-[9px] uppercase tracking-widest px-3 py-1 rounded-full font-extrabold border border-rose-400/20 text-white">
+                Certificate Locked 🔒
+              </span>
+              <h3 className="text-xl font-black tracking-tight">
+                {progress.approvalStatus !== 'approved' ? "Pawan Sir's Approval Required" : "Certificate Access Disabled 🔒"}
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                {progress.approvalStatus !== 'approved' 
+                  ? '"Beta, completion certificate download ya print karne ke liye aapka Student account approved hona zaroori hai. Pawan Sir jab aapko verified status denge tabhi aap isko print kar sakte hain."'
+                  : '"Beta, aapke account par Pawan Sir dwara certificate access temporary disable kiya gaya hai. Kripya Pawan Sir se connect karein."'}
+              </p>
             </div>
-          )}
-        </div>
+            <div className="shrink-0">
+              <div className="text-center bg-rose-950/40 border border-rose-800/40 p-4.5 rounded-2xl min-w-[150px]">
+                <div className="text-[10px] text-rose-300 uppercase font-extrabold tracking-wider mb-1 flex items-center justify-center gap-1">
+                  <Lock className="w-3 h-3 text-rose-400 animate-pulse" />
+                  {progress.approvalStatus !== 'approved' ? 'Approval Needed' : 'Permission Off'}
+                </div>
+                <div className="text-sm font-black text-white mt-1 uppercase tracking-wide">
+                  {progress.approvalStatus !== 'approved' 
+                    ? (progress.approvalStatus === 'rejected' ? 'REJECTED' : 'PENDING') 
+                    : 'LOCKED'}
+                </div>
+                <div className="text-[9px] text-rose-300/70 mt-1 uppercase font-semibold">Contact Faculty</div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="space-y-2.5 max-w-xl">
+              <span className="bg-indigo-600/80 text-[9px] uppercase tracking-widest px-3 py-1 rounded-full font-extrabold border border-indigo-400/20">
+                Python Mastery Certificate
+              </span>
+              <h3 className="text-xl font-black tracking-tight">Aapka Certificate Ready Hai?</h3>
+              <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                Syllabus ke saare 16 chapters complete karke quizzes solve kijiye. Jaise hi aapka 100% complete hoga, hamara system aapko <strong>Mr. Pawan Pandey</strong> (PyGuru AI Tutor) dwara signed verified certificate generate karke dega. Isko aap save karke print kar sakte hain!
+              </p>
+            </div>
+            <div className="shrink-0 flex flex-col items-center gap-2">
+              {isCompleted ? (
+                <button
+                  onClick={handlePrintCertificate}
+                  className="flex items-center gap-2 px-5.5 py-3.5 bg-indigo-600 text-white rounded-xl font-extrabold text-xs uppercase tracking-wider hover:bg-indigo-500 shadow-lg shadow-indigo-600/30 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print Certificate
+                </button>
+              ) : (
+                <div className="text-center bg-slate-800/40 border border-slate-700/40 p-4.5 rounded-2xl min-w-[120px]">
+                  <div className="text-[10px] text-slate-400 uppercase font-extrabold tracking-wider mb-1">Your Progress</div>
+                  <div className="text-4xl font-black text-indigo-400">{percentComplete}%</div>
+                  <div className="text-[9px] text-slate-400 mt-1.5 uppercase font-semibold">Need 100% to print</div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Actual Certificate markup hidden on-screen unless complete, but styled beautifully for window.print() */}
-      {isCompleted && (
+      {isCompleted && progress.approvalStatus === 'approved' && progress.certAllowed !== false && (
         <div className="hidden print:block bg-white p-8 border-[12px] border-amber-900/40 rounded-sm w-full max-w-[900px] mx-auto text-slate-800 text-center relative aspect-[1.414/1] shadow-xl font-sans">
           {/* Borders */}
           <div className="border border-amber-800/20 p-8 h-full flex flex-col justify-between items-center relative">

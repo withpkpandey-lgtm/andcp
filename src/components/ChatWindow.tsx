@@ -21,7 +21,11 @@ import {
   Laptop, 
   CheckCircle, 
   Copy, 
-  AlertCircle
+  AlertCircle,
+  Trash2,
+  Lock,
+  X,
+  Image
 } from 'lucide-react';
 import { Message, Topic, QuizQuestion } from '../types';
 
@@ -29,12 +33,16 @@ interface ChatWindowProps {
   messages: Message[];
   activeTopicId: string;
   topics: Topic[];
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string, image?: string) => void;
   onQuizAnswer: (topicId: string, question: QuizQuestion, selectedIndex: number) => void;
   onLoadCodeInPlayground?: (code: string) => void;
   studentName?: string;
   studentRoll?: string;
   studentStream?: string;
+  onClearChat?: () => void;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  onRegisterClick?: () => void;
+  tutorPhoto?: string;
 }
 
 export default function ChatWindow({
@@ -46,11 +54,18 @@ export default function ChatWindow({
   onLoadCodeInPlayground,
   studentName = 'Beta',
   studentRoll = '',
-  studentStream = 'B.pharm'
+  studentStream = 'B.pharm',
+  onClearChat,
+  approvalStatus = 'pending',
+  onRegisterClick,
+  tutorPhoto = ''
 }: ChatWindowProps) {
   const [inputText, setInputText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [attachedImage, setAttachedImage] = useState<string>('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const currentTopic = topics.find(t => t.id === activeTopicId) || topics[0];
 
@@ -60,9 +75,11 @@ export default function ChatWindow({
   }, [messages]);
 
   const handleSend = () => {
-    if (inputText.trim()) {
-      onSendMessage(inputText.trim());
+    if (inputText.trim() || attachedImage) {
+      onSendMessage(inputText.trim(), attachedImage || undefined);
       setInputText('');
+      setAttachedImage('');
+      setShowEmojiPicker(false);
     }
   };
 
@@ -153,114 +170,177 @@ export default function ChatWindow({
   // Predefined suggestion chips for easy student interaction
   const suggestions = [
     { label: 'Pawan Sir, next topic please! 📚', prompt: `Pawan Sir, please introduce the next topic for me!` },
-    { label: 'Explain variables in Hinglish 🇮🇳', prompt: `Pawan Sir, can you explain variables in Hinglish with simple pharmacy lab examples?` },
+    { label: 'Explain Python in Hinglish 🇮🇳', prompt: `Pawan Sir, can you explain what is Python, its importance, uses and how it is different from other languages?` },
     { label: 'Give me a dynamic quiz! 🎯', prompt: `Pawan Sir, take my quick test or quiz on the current topic!` },
     { label: 'Pharmaceutical Code check 🧪', prompt: `Pawan Sir, help me write a Python program for dilution or first-order drug half life.` },
   ];
 
-  // PDF download logic
-  const handleDownloadPDF = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    
+  // Word Document download logic (.doc format compatible with MS Word)
+  const handleDownloadWord = () => {
+    const header = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' 
+            xmlns:w='urn:schemas-microsoft-com:office:word' 
+            xmlns='http://www.w3.org/TR/REC-html40'>
+      <head>
+        <meta charset="utf-8">
+        <title>Python Study Notes - Mr. Pawan Pandey</title>
+        <style>
+          body { 
+            font-family: 'Calibri', 'Arial', sans-serif; 
+            padding: 20px; 
+            color: #1e293b; 
+          }
+          .header { 
+            text-align: center; 
+            border-bottom: 2px solid #4f46e5; 
+            padding-bottom: 15px; 
+            margin-bottom: 25px; 
+          }
+          .logo { 
+            font-size: 20pt; 
+            font-weight: bold; 
+            color: #4f46e5; 
+          }
+          .subtitle { 
+            font-size: 11pt; 
+            color: #475569; 
+            margin-top: 5px; 
+            font-weight: italic;
+          }
+          .student-info {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 12px;
+            margin: 15px 0;
+            font-size: 10pt;
+            color: #334155;
+          }
+          .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+          }
+          .info-table td {
+            padding: 4px 8px;
+            font-size: 10pt;
+          }
+          .message-box {
+            margin-bottom: 15px; 
+            padding: 12px; 
+            border: 1px solid #cbd5e1; 
+            border-radius: 8px;
+          }
+          .message-tutor { 
+            background-color: #f1f5f9; 
+            border-left: 4px solid #4f46e5; 
+          }
+          .message-student { 
+            background-color: #ffffff; 
+            border-left: 4px solid #10b981; 
+          }
+          .sender-title {
+            font-weight: bold; 
+            font-size: 10pt; 
+            margin-bottom: 4px;
+          }
+          .sender-tutor { color: #4f46e5; }
+          .sender-student { color: #10b981; }
+          .message-text { 
+            font-size: 10.5pt; 
+            line-height: 1.5; 
+            color: #1e293b; 
+          }
+          .footer { 
+            text-align: center; 
+            font-size: 9pt; 
+            color: #64748b; 
+            border-top: 1px solid #e2e8f0; 
+            padding-top: 15px; 
+            margin-top: 35px; 
+          }
+          code {
+            font-family: 'Consolas', 'Courier New', monospace;
+            background-color: #f1f5f9;
+            padding: 2px 4px;
+            font-size: 9.5pt;
+          }
+        </style>
+      </head>
+      <body>
+    `;
+
+    const footer = `
+      </body>
+      </html>
+    `;
+
     const messagesHtml = messages.map(msg => {
       const isTutor = msg.sender === 'tutor';
       const senderName = isTutor ? 'Mr. Pawan Pandey (Tutor)' : `${studentName} (${studentStream})`;
+      
+      // Basic markdown replacement for rich formatting in Word
+      let formattedText = msg.text
+        .replace(/\r?\n/g, '<br/>')
+        .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+        .replace(/\*(.*?)\*/g, '<i>$1</i>')
+        .replace(/`(.*?)`/g, '<code>$1</code>');
+
       return `
-        <div style="margin-bottom: 20px; padding: 15px; border-radius: 12px; background-color: ${isTutor ? '#f5f7ff' : '#ffffff'}; border: 1px solid #e2e8f0; page-break-inside: avoid;">
-          <div style="font-weight: bold; font-size: 11px; color: ${isTutor ? '#4f46e5' : '#475569'}; margin-bottom: 6px; display: flex; justify-content: space-between;">
-            <span>${senderName}</span>
-            <span style="color: #94a3b8;">${msg.timestamp}</span>
+        <div class="message-box ${isTutor ? 'message-tutor' : 'message-student'}">
+          <div class="sender-title ${isTutor ? 'sender-tutor' : 'sender-student'}">
+            ${senderName} <span style="font-weight: normal; font-size: 8.5pt; color: #64748b; margin-left: 10px;">[${msg.timestamp}]</span>
           </div>
-          <div style="font-size: 13px; line-height: 1.6; color: #1e293b; white-space: pre-wrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-            ${msg.text}
+          <div class="message-text">
+            ${formattedText}
           </div>
         </div>
       `;
     }).join('');
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Python Study Notes - Mr. Pawan Pandey</title>
-          <style>
-            body { 
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; 
-              padding: 40px; 
-              color: #334155; 
-              max-width: 800px; 
-              margin: 0 auto; 
-              background-color: #fafafa;
-            }
-            .header { 
-              text-align: center; 
-              border-bottom: 3px double #e2e8f0; 
-              padding-bottom: 20px; 
-              margin-bottom: 30px; 
-            }
-            .logo { 
-              font-size: 26px; 
-              font-weight: 800; 
-              color: #4f46e5; 
-              letter-spacing: -0.5px;
-            }
-            .subtitle { 
-              font-size: 14px; 
-              color: #64748b; 
-              margin-top: 6px; 
-              font-weight: 500;
-            }
-            .student-info {
-              background-color: #f1f5f9;
-              border-radius: 8px;
-              padding: 10px 15px;
-              margin: 15px 0;
-              font-size: 12px;
-              display: flex;
-              justify-content: space-around;
-              color: #475569;
-              font-weight: 600;
-            }
-            .footer { 
-              text-align: center; 
-              font-size: 11px; 
-              color: #94a3b8; 
-              border-top: 1px solid #e2e8f0; 
-              padding-top: 20px; 
-              margin-top: 40px; 
-              font-weight: 500;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="logo">💊 PyGuru AI: Pharmaceutical Python Ledger 🐍</div>
-            <div class="subtitle">Personal Tutor: Mr. Pawan Pandey (HOD Pharmaceutical Chemistry AI)</div>
-            <div class="student-info">
-              <span>Student: ${studentName}</span>
-              <span>Roll No: ${studentRoll || 'N/A'}</span>
-              <span>Stream: ${studentStream}</span>
-            </div>
-            <div style="font-size: 12px; color: #4f46e5; font-weight: bold; margin-top: 10px; background-color: #e0e7ff; display: inline-block; padding: 4px 12px; border-radius: 9999px;">
-              Active Topic: ${currentTopic.name}
-            </div>
-          </div>
-          <main>
-            ${messagesHtml}
-          </main>
-          <div class="footer">
-            Generated via PyGuru AI Hub. Verified by Mr. Pawan Pandey. Seekhte Raho, Badhte Raho!
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    const bodyContent = `
+      <div class="header">
+        <div class="logo">💊 PyGuru AI: Pharmaceutical Python Ledger 🐍</div>
+        <div class="subtitle">Personal Tutor: Mr. Pawan Pandey (IT expert and professional)</div>
+      </div>
+      
+      <div class="student-info">
+        <table class="info-table">
+          <tr>
+            <td><b>Student Name:</b> ${studentName}</td>
+            <td><b>Roll No:</b> ${studentRoll || 'N/A'}</td>
+          </tr>
+          <tr>
+            <td><b>Stream:</b> ${studentStream}</td>
+            <td><b>Active Topic:</b> ${currentTopic.name}</td>
+          </tr>
+          <tr>
+            <td><b>Generated Date:</b> ${new Date().toLocaleDateString('en-IN')}</td>
+            <td><b>Status:</b> Registered Student</td>
+          </tr>
+        </table>
+      </div>
+
+      <main>
+        ${messagesHtml}
+      </main>
+
+      <div class="footer">
+        Generated via PyGuru AI Hub. Verified by Mr. Pawan Pandey. Seekhte Raho, Badhte Raho!
+      </div>
+    `;
+
+    const fullDoc = header + bodyContent + footer;
+    
+    // Create Blob with application/msword type and download it
+    const blob = new Blob(['\ufeff' + fullDoc], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `PyGuru_Study_Notes_${currentTopic.name.replace(/\s+/g, '_')}.doc`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const filteredMessages = messages.filter(m => {
@@ -269,28 +349,37 @@ export default function ChatWindow({
   });
 
   return (
-    <div className="flex flex-col h-[650px] bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-xl relative transition-all duration-300">
+    <div className="flex flex-col h-[650px] bg-white rounded-3xl overflow-hidden border border-indigo-100/40 shadow-2xl shadow-indigo-950/[0.04] relative transition-all duration-300 animate-fadeIn">
       
       {/* Redesigned Trendy Gradient Header */}
-      <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white px-5 py-4 flex items-center justify-between z-10 shrink-0 shadow-md">
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white px-5 py-4 flex items-center justify-between z-10 shrink-0 border-b border-indigo-500/10 shadow-lg shadow-indigo-950/5">
         <div className="flex items-center gap-3.5">
           {/* Mr. Pawan Pandey Avatar */}
           <div className="relative">
-            <div className="w-11 h-11 bg-gradient-to-tr from-amber-500 to-indigo-500 rounded-full flex items-center justify-center text-white font-serif font-extrabold text-base border-2 border-indigo-300/40 shadow-inner">
-              PP
-            </div>
+            {tutorPhoto ? (
+              <img 
+                src={tutorPhoto} 
+                alt="Mr. Pawan Pandey" 
+                className="w-11 h-11 rounded-full object-cover border-2 border-amber-400/50 shadow-inner hover:scale-105 transition-all duration-300"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-11 h-11 bg-gradient-to-tr from-amber-500 via-violet-500 to-indigo-500 rounded-full flex items-center justify-center text-white font-display font-black text-base border-2 border-amber-400/50 shadow-inner">
+                PP
+              </div>
+            )}
             {/* Active Status Ring */}
             <span className="absolute bottom-0 right-0 bg-emerald-500 text-white rounded-full p-0.5 border-2 border-slate-950">
               <span className="block w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             </span>
           </div>
-
+ 
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-extrabold text-white text-sm sm:text-base tracking-tight leading-none">Mr. Pawan Pandey</h3>
-              <span className="bg-amber-400/20 text-amber-300 border border-amber-400/30 font-bold text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wide">AI Tutor</span>
+              <h3 className="font-display font-extrabold text-white text-sm sm:text-base tracking-tight leading-none">Mr. Pawan Pandey</h3>
+              <span className="bg-amber-400/15 text-amber-300 border border-amber-400/30 font-display font-black text-[8px] px-2 py-0.5 rounded-full uppercase tracking-widest">AI Tutor</span>
             </div>
-            <p className="text-[10px] text-indigo-200 font-medium flex items-center gap-1.5 mt-1.5">
+            <p className="text-[10px] text-indigo-200 font-bold flex items-center gap-1.5 mt-1.5">
               <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
               Online (Lecturer, Pharmaceutical Science)
             </p>
@@ -308,15 +397,59 @@ export default function ChatWindow({
           </button>
           
           <button 
-            onClick={handleDownloadPDF}
-            title="Download Study Notes as PDF" 
+            onClick={handleDownloadWord}
+            title="Download Study Notes as MS Word (.doc)" 
             className="p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-md shadow-indigo-600/20 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95"
           >
             <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Save PDF</span>
+            <span className="hidden sm:inline">Save Word</span>
           </button>
+
+          {onClearChat && (
+            <button 
+              onClick={() => setShowClearConfirm(true)}
+              title="Clear Chat History" 
+              className="p-2 hover:bg-rose-950/40 hover:text-rose-400 rounded-xl text-rose-300 transition-all active:scale-95 cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Clear Chat Confirmation Modal Overlay */}
+      {showClearConfirm && (
+        <div className="absolute inset-0 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full border border-slate-200 shadow-2xl text-center space-y-4">
+            <div className="w-12 h-12 bg-rose-50 rounded-full flex items-center justify-center text-rose-600 mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="font-extrabold text-slate-800 text-base">Clear Chat History?</h4>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Kya aap pichli chat history ko delete karna chahte hain? Isse aapka chat log clean ho jayega aur Pawan Sir firse welcome karenge.
+              </p>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-all cursor-pointer"
+              >
+                Nahi, Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowClearConfirm(false);
+                  if (onClearChat) onClearChat();
+                }}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-600/15 transition-all cursor-pointer"
+              >
+                Haan, Clear karein
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Dynamic Search Bar */}
       {showSearch && (
@@ -376,30 +509,40 @@ export default function ChatWindow({
               >
                 {/* Bubble styling */}
                 <div
-                  className={`p-4 rounded-3xl relative shadow-md ${
+                  className={`p-4 rounded-3xl relative transition-all duration-300 hover:shadow-lg ${
                     isTutor
-                      ? 'bg-white rounded-tl-none border border-slate-200/70 text-slate-800'
-                      : 'bg-indigo-600 rounded-tr-none self-end text-white'
+                      ? 'bg-white rounded-tl-none border border-indigo-100/50 text-slate-800 shadow-md shadow-slate-200/20'
+                      : 'bg-gradient-to-tr from-indigo-600 via-violet-600 to-indigo-700 rounded-tr-none self-end text-white shadow-lg shadow-indigo-500/15 border border-indigo-500/10'
                   }`}
                 >
                   {/* Sender Name */}
                   {isTutor && (
-                    <div className="text-[10px] font-extrabold text-indigo-600 mb-1 flex items-center gap-1">
+                    <div className="text-[10px] font-black text-indigo-600 mb-1 flex items-center gap-1.5 uppercase tracking-wider">
                       <span>Pawan Sir (Tutor)</span>
-                      <span className="w-1 h-1 rounded-full bg-slate-300" />
-                      <span className="text-[8px] uppercase text-slate-400">Pharmacist Expert</span>
+                      <span className="w-1 h-1 rounded-full bg-indigo-200" />
+                      <span className="text-[8px] font-extrabold text-slate-400">Pharmacist Expert</span>
                     </div>
                   )}
-
+ 
                   {/* Simulated typing dot-loader */}
                   {msg.isTyping ? (
                     <div className="flex gap-1.5 py-2 px-1 items-center">
-                      <span className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                      <span className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                      <span className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" />
+                      <span className="w-2.5 h-2.5 bg-indigo-600 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                      <span className="w-2.5 h-2.5 bg-indigo-600 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                      <span className="w-2.5 h-2.5 bg-indigo-600 rounded-full animate-bounce" />
                     </div>
                   ) : (
                     <div className="space-y-3">
+                      {msg.image && (
+                        <div className="rounded-2xl overflow-hidden border border-slate-200/20 max-w-full">
+                          <img 
+                            src={msg.image} 
+                            alt="Attached screenshot/image" 
+                            className="max-h-64 rounded-xl w-full object-cover cursor-pointer hover:scale-101 transition-all"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                      )}
                       {/* Message Body Text with custom Code Block Extractors */}
                       {isTutor ? (
                         <div className="space-y-1">
@@ -490,50 +633,193 @@ export default function ChatWindow({
         <div ref={chatEndRef} />
       </div>
 
-      {/* Suggestion Chips Panel */}
-      <div className="bg-slate-50 border-t border-slate-100 p-2.5 flex gap-2 overflow-x-auto shrink-0 scrollbar-none z-10">
-        {suggestions.map((chip, idx) => (
-          <button
-            key={idx}
-            onClick={() => onSendMessage(chip.prompt)}
-            className="flex items-center gap-1.5 shrink-0 px-3.5 py-2 bg-white border border-slate-200 rounded-full text-xs font-semibold text-slate-700 hover:border-indigo-500 hover:text-indigo-700 hover:bg-indigo-50/30 shadow-sm transition-all cursor-pointer"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            {chip.label}
-          </button>
-        ))}
-      </div>
-
-      {/* WhatsApp Message Input Panel */}
-      <div className="bg-slate-50 border-t border-slate-200/60 px-4 py-3.5 flex items-center gap-3 shrink-0 z-10">
-        <button title="Smile/Emoji" className="text-slate-500 hover:text-slate-700 p-1 hover:bg-slate-200 rounded-lg">
-          <Smile className="w-5 h-5" />
-        </button>
-        <button title="Attach file" className="text-slate-500 hover:text-slate-700 p-1 hover:bg-slate-200 rounded-lg">
-          <Paperclip className="w-5 h-5" />
-        </button>
-
-        {/* Text Area Input */}
-        <div className="flex-1">
-          <input
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={handleKeyPress}
-            placeholder={`Ask Pawan Sir to write code, ${studentName}...`}
-            className="w-full px-4.5 py-3 bg-white border border-slate-200 rounded-2xl text-xs sm:text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 shadow-inner"
-          />
+      {/* Locked / Pending Approval / Unregistered Warning Panel */}
+      {(!studentName || studentName === 'Beta' || studentName.trim() === '') ? (
+        <div className="bg-slate-50 border-t border-slate-200 p-6 flex flex-col items-center justify-center text-center space-y-3 shrink-0 z-10 animate-slideUp">
+          <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 shadow-sm">
+            <Lock className="w-5 h-5 animate-pulse" />
+          </div>
+          <div className="max-w-md px-4 space-y-1">
+            <h4 className="text-sm font-black text-slate-800 tracking-tight">
+              🔒 Chat Restricted (Keval Registered Students)
+            </h4>
+            <p className="text-[11px] sm:text-xs text-slate-500 leading-relaxed font-bold">
+              Beta, chat karne aur Pawan Sir se coding seekhne ke liye aapko pehle profile create karna hoga. Welcome messages upar show ho rahe hain.
+            </p>
+          </div>
+          {onRegisterClick && (
+            <button
+              onClick={onRegisterClick}
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-extrabold rounded-xl shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer"
+            >
+              Apna Profile Register Karein 🚀
+            </button>
+          )}
         </div>
+      ) : approvalStatus !== 'approved' ? (
+        <div className="bg-slate-100 border-t border-slate-200 p-6 flex flex-col items-center justify-center text-center space-y-3 shrink-0 z-10">
+          <div className={`p-3 rounded-full border shadow-sm animate-pulse ${
+            approvalStatus === 'rejected'
+              ? 'bg-rose-50 border-rose-200 text-rose-600'
+              : 'bg-amber-50 border-amber-200 text-amber-600'
+          }`}>
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <div className="max-w-md px-4">
+            <h4 className="text-sm font-black text-slate-800 tracking-tight">
+              {approvalStatus === 'rejected'
+                ? '❌ Access Rejected / Account Blocked!'
+                : '🟡 Approval Request Pending...'}
+            </h4>
+            <p className="text-xs text-slate-500 leading-relaxed mt-1.5 font-medium">
+              {approvalStatus === 'rejected'
+                ? `Aapka profile (*${studentName || 'Beta'}*) reject ya block kar diya gaya hai. Kripya naye registration ya discipline/abuse unblock ke liye Pawan Sir (Admin) se contact karein aur unse approval request karein!`
+                : `Aapka registration validation request Pawan Sir ke approval ke liye pending hai! Pawan Sir jab aapko approve karenge, tab aap chat kar payenge.`}
+            </p>
+          </div>
+          <div className={`text-[10px] px-3 py-1 rounded-full font-extrabold uppercase tracking-wider border ${
+            approvalStatus === 'rejected'
+              ? 'bg-rose-100 text-rose-800 border-rose-200 animate-pulse'
+              : 'bg-amber-100 text-amber-800 border-amber-200'
+          }`}>
+            Status: {approvalStatus === 'rejected' ? 'BLOCKED / REJECTED' : (approvalStatus || 'PENDING')}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Suggestion Chips Panel */}
+          <div className="bg-slate-50 border-t border-slate-100 p-2.5 flex gap-2 overflow-x-auto shrink-0 scrollbar-none z-10">
+            {suggestions.map((chip, idx) => (
+              <button
+                key={idx}
+                onClick={() => onSendMessage(chip.prompt)}
+                className="flex items-center gap-1.5 shrink-0 px-3.5 py-2 bg-white border border-slate-200 rounded-full text-xs font-semibold text-slate-700 hover:border-indigo-500 hover:text-indigo-700 hover:bg-indigo-50/30 shadow-sm transition-all cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                {chip.label}
+              </button>
+            ))}
+          </div>
 
-        {/* Send Button */}
-        <button
-          onClick={handleSend}
-          disabled={!inputText.trim()}
-          className="p-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-2xl shadow-lg shadow-indigo-600/30 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
-        >
-          <Send className="w-4 h-4" />
-        </button>
-      </div>
+          {/* Attached Image Thumbnail Preview */}
+          {attachedImage && (
+            <div className="bg-slate-100 border-t border-slate-200/50 px-4 py-2 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="relative">
+                  <img 
+                    src={attachedImage} 
+                    alt="Preview" 
+                    className="w-10 h-10 object-cover rounded-xl border border-slate-200 shadow-xs"
+                    referrerPolicy="no-referrer"
+                  />
+                  <button 
+                    onClick={() => setAttachedImage('')}
+                    className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white rounded-full p-0.5 border border-white hover:bg-rose-700 hover:scale-105 active:scale-95 transition-all shadow-xs"
+                    title="Remove attachment"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-500 font-bold leading-none">Screen Shot / Image Attached! 📸</p>
+                  <p className="text-[9px] text-indigo-600 font-semibold italic mt-1">Pawan Sir is image ko direct dekh kar explain karenge.</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setAttachedImage('')}
+                className="text-xs text-rose-600 font-bold hover:bg-rose-50 px-2.5 py-1 rounded-lg"
+              >
+                Hataen
+              </button>
+            </div>
+          )}
+
+          {/* WhatsApp Message Input Panel */}
+          <div className="relative bg-slate-50 border-t border-slate-200/60 px-4 py-3.5 flex items-center gap-3 shrink-0 z-10">
+            {/* Quick Emoji Picker Panel */}
+            {showEmojiPicker && (
+              <div className="absolute bottom-16 left-4 bg-white border border-slate-200 rounded-3xl p-3 shadow-xl grid grid-cols-6 gap-2.5 z-50 w-64 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                <div className="col-span-6 flex justify-between items-center mb-1 border-b border-slate-100 pb-1">
+                  <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Quick Emojis 🐍💊</span>
+                  <button 
+                    onClick={() => setShowEmojiPicker(false)}
+                    className="text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {['🐍', '💻', '🧪', '💊', '🔬', '🎯', '💡', '👍', '📝', '❓', '❌', '🌟', '😊', '🙏', '🔥', '⚙️', '📊', '📈'].map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() => {
+                      setInputText(prev => prev + emoji);
+                    }}
+                    className="text-base hover:scale-125 transition-all duration-100 p-1 hover:bg-slate-50 rounded-lg cursor-pointer flex items-center justify-center"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <button 
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              title="Smile/Emoji" 
+              className={`text-slate-500 hover:text-slate-700 p-1 hover:bg-slate-200 rounded-lg transition-all ${showEmojiPicker ? 'bg-slate-200 text-indigo-600' : ''}`}
+            >
+              <Smile className="w-5 h-5" />
+            </button>
+
+            {/* Hidden Input File for Attachments */}
+            <input 
+              id="chat-image-upload"
+              type="file" 
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    if (typeof reader.result === 'string') {
+                      setAttachedImage(reader.result);
+                    }
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
+              className="hidden"
+            />
+            <label 
+              htmlFor="chat-image-upload"
+              title="Attach screenshot or image" 
+              className="text-slate-500 hover:text-slate-700 p-1 hover:bg-slate-200 rounded-lg cursor-pointer transition-all flex items-center justify-center"
+            >
+              <Paperclip className="w-5 h-5" />
+            </label>
+
+            {/* Text Area Input */}
+            <div className="flex-1">
+              <input
+                type="text"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={handleKeyPress}
+                placeholder={`Ask Pawan Sir to write code, ${studentName}...`}
+                className="w-full px-4.5 py-3 bg-white border border-slate-200 rounded-2xl text-xs sm:text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 shadow-inner"
+              />
+            </div>
+
+            {/* Send Button */}
+            <button
+              onClick={handleSend}
+              disabled={!inputText.trim() && !attachedImage}
+              className="p-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-2xl shadow-lg shadow-indigo-600/30 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

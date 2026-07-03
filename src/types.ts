@@ -38,6 +38,7 @@ export interface Message {
   timestamp: string;
   type?: 'text' | 'quiz' | 'code' | 'project';
   code?: string;
+  image?: string; // Base64 data URL of attached image
   quizData?: QuizQuestion;
   quizAnsweredIndex?: number;
   quizIsCorrect?: boolean;
@@ -53,6 +54,38 @@ export interface StudentProgress {
   quizScores: { [topicId: string]: { score: number, total: number } };
   currentTopicId: string;
   joinedDate: string;
+  completedLabs?: string[]; // List of completed lab program IDs
+  attemptedLabs?: string[]; // List of attempted lab program IDs
+  labSubmissions?: { [labId: string]: { code: string; score: number; feedback: string; date: string } };
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  syllabusAllowed?: boolean;
+  labsAllowed?: boolean;
+  certAllowed?: boolean;
+  pharmaAllowed?: boolean;
+  profilePic?: string; // Base64 image data or URL
+  phoneNumber?: string; // WhatsApp/Mobile number for payment/notifications
+  pinCode?: string; // Security PIN for private chat access
+}
+
+export interface LabProgram {
+  id: string;
+  title: string;
+  category: 'basics' | 'conditions' | 'loops' | 'functions' | 'data_structures' | 'file_handling' | 'oop' | 'libraries' | 'pharma';
+  objective: string;
+  theory: string;
+  code: string;
+  lineByLine: { line: string; desc: string }[];
+  inputExample: string;
+  outputExample: string;
+  practiceTask: string;
+  isCustom?: boolean;
+}
+
+export interface StudentProfile {
+  id: string;
+  progress: StudentProgress;
+  messages: Message[];
+  topicsState: Topic[];
 }
 
 export interface PharmaProgram {
@@ -289,6 +322,48 @@ To get 500 g of exactly 20% formulation!`,
 
 export const INITIAL_TOPICS: Topic[] = [
   // BASICS
+  {
+    id: 'intro_python',
+    name: 'Introduction to Python 🐍',
+    category: 'basics',
+    description: 'Learn what Python is, its importance, its uses, and how it stands out from other programming languages.',
+    syllabus: [
+      'What is Python? (Python क्या है?)',
+      'Importance and Key Uses of Python (Python का महत्व और उपयोग)',
+      'Why is Python different from other languages? (Python दूसरी भाषाओं से अलग क्यों है?)',
+      'Python in Pharmacy & Healthcare (फार्मेसी और हेल्थकेयर में उपयोग)'
+    ],
+    completed: false,
+    unlocked: true,
+    quiz: [
+      {
+        question: 'Who created the Python programming language?',
+        options: ['Dennis Ritchie', 'Guido van Rossum', 'James Gosling', 'Bjarne Stroustrup'],
+        answerIndex: 1,
+        explanation: 'Python was created by Guido van Rossum in the late 1980s and was first released in 1991.'
+      },
+      {
+        question: 'Which of the following is NOT a core characteristic of Python?',
+        options: ['Highly readable syntax', 'Semicolon and curly bracket enforcement after every statement', 'Cross-platform compatibility', 'Rich ecosystem of libraries'],
+        answerIndex: 1,
+        explanation: 'Python does not enforce semicolons or curly brackets for block boundaries. Instead, it uses clean indentation (whitespace), making it incredibly clean and easy to read.'
+      },
+      {
+        question: 'Why is Python highly preferred in Pharmacy, Biology, and Healthcare research?',
+        options: ['Because it only runs on pharmacy computers', 'Because of powerful data analysis libraries like Pandas and simulation tools', 'Because it can manufacture physical tablets', 'Because it does not support decimal numbers'],
+        answerIndex: 1,
+        explanation: 'Python has powerful data analysis libraries like Pandas, NumPy, and scientific tools that allow researchers to model molecular structures, simulate clinical trials, and run pharmacokinetics curves easily.'
+      }
+    ],
+    projectDescription: 'Write a basic Python script that prints an overview of Python, its creator, and its application in pharma, showing how clean Python code is.',
+    projectStarterCode: `# Warm-up script: Introduction to Python
+print("--- Welcome to Python for Pharmacy ---")
+creator = "Guido van Rossum"
+uses = "Data Analysis, AI, and Simulation"
+
+# Print details (Your code below to display these variables)
+`
+  },
   {
     id: 'variables',
     name: 'Variables in Python',

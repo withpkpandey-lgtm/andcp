@@ -19,7 +19,8 @@ import {
   HelpCircle,
   FileCode,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Lock
 } from 'lucide-react';
 import { Topic, MessageLineExplanation, PHARMA_PROGRAMS, PharmaProgram } from '../types';
 
@@ -27,9 +28,17 @@ interface CodePlaygroundProps {
   topics: Topic[];
   activeTopicId: string;
   onCodeRunSuccess: (topicId: string) => void;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  pharmaAllowed?: boolean;
 }
 
-export default function CodePlayground({ topics, activeTopicId, onCodeRunSuccess }: CodePlaygroundProps) {
+export default function CodePlayground({ 
+  topics, 
+  activeTopicId, 
+  onCodeRunSuccess, 
+  approvalStatus = 'pending',
+  pharmaAllowed = true
+}: CodePlaygroundProps) {
   const currentTopic = topics.find(t => t.id === activeTopicId) || topics[0];
   
   const [code, setCode] = useState(currentTopic.projectStarterCode || '# Write your Python code here...');
@@ -55,21 +64,54 @@ export default function CodePlayground({ topics, activeTopicId, onCodeRunSuccess
   // Line by line outcomes
   const [lineByLineExplanations, setLineByLineExplanations] = useState<MessageLineExplanation[]>([]);
   const [selectedLineIdx, setSelectedLineIdx] = useState<number | null>(null);
+  const [selectedPharmaProgId, setSelectedPharmaProgId] = useState<string | null>(null);
 
-  // Load starter code when active topic changes
+  // Load starter code when active topic changes or tabs switch
   useEffect(() => {
-    if (activePlaygroundTab === 'project' && currentTopic && currentTopic.projectStarterCode) {
-      setCode(currentTopic.projectStarterCode);
-      // Reset output states
-      setTerminalOutput('Loaded: ' + currentTopic.name + ' project starter code! Try running it. 🚀');
-      setTerminalError('');
-      setRunSummary('');
-      setErrorLineIndicator(null);
-      setDebugResult(null);
-      setLineByLineExplanations([]);
-      setSelectedLineIdx(null);
+    if (activePlaygroundTab === 'project') {
+      if (currentTopic && currentTopic.projectStarterCode) {
+        setCode(currentTopic.projectStarterCode);
+        // Reset output states
+        setTerminalOutput('Loaded: ' + currentTopic.name + ' project starter code! Try running it. 🚀');
+        setTerminalError('');
+        setRunSummary('');
+        setErrorLineIndicator(null);
+        setDebugResult(null);
+        setLineByLineExplanations([]);
+        setSelectedLineIdx(null);
+      }
+    } else if (activePlaygroundTab === 'pharma_library') {
+      if (approvalStatus === 'approved' && pharmaAllowed !== false && PHARMA_PROGRAMS.length > 0) {
+        const firstProg = PHARMA_PROGRAMS[0];
+        setSelectedPharmaProgId(firstProg.id);
+        setCode(firstProg.code);
+        setTerminalOutput(firstProg.simulatedOutput);
+        setTerminalError('');
+        setRunSummary('');
+        setErrorLineIndicator(null);
+        setDebugResult(null);
+
+        // Map explanations
+        const formattedExplanations: MessageLineExplanation[] = firstProg.explanation.map((exp, idx) => ({
+          line: exp.line,
+          index: idx,
+          explanation: exp.desc
+        }));
+        setLineByLineExplanations(formattedExplanations);
+        setSelectedLineIdx(0);
+      } else {
+        setSelectedPharmaProgId(null);
+        setCode('# Pharma Library is currently locked.\n# Contact Pawan Sir to unlock!');
+        setTerminalOutput('Pharma Library is locked. Check permission status on the left panel.');
+        setTerminalError('');
+        setRunSummary('');
+        setErrorLineIndicator(null);
+        setDebugResult(null);
+        setLineByLineExplanations([]);
+        setSelectedLineIdx(null);
+      }
     }
-  }, [activeTopicId, activePlaygroundTab]);
+  }, [activeTopicId, activePlaygroundTab, approvalStatus, pharmaAllowed]);
 
   // Support external loading (e.g. from chatbot "Send to Playground")
   useEffect(() => {
@@ -135,9 +177,11 @@ export default function CodePlayground({ topics, activeTopicId, onCodeRunSuccess
         }
         setRunSummary(data.summary || '');
         
-        // If code runs successfully (exit code 0), auto-mark project/topic completed!
+        // If code runs successfully (exit code 0), auto-mark project/topic completed! (ONLY in project tab)
         if (data.exitCode === 0 && !data.stderr) {
-          onCodeRunSuccess(currentTopic.id);
+          if (activePlaygroundTab === 'project') {
+            onCodeRunSuccess(currentTopic.id);
+          }
         }
       }
     } catch (err: any) {
@@ -240,13 +284,13 @@ export default function CodePlayground({ topics, activeTopicId, onCodeRunSuccess
     <div className="flex flex-col gap-6 h-full">
       
       {/* Redesigned Trendy Workspace Panel Selector */}
-      <div className="bg-slate-100 rounded-2xl p-1.5 border border-slate-200/60 shadow-sm flex gap-1">
+      <div className="bg-white/80 backdrop-blur-md rounded-2xl p-1.5 border border-slate-200/50 shadow-xs flex gap-2">
         <button
           onClick={() => setActivePlaygroundTab('project')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-extrabold transition-all duration-300 transform active:scale-95 cursor-pointer ${
             activePlaygroundTab === 'project'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-600/15'
+              : 'text-slate-600 hover:bg-slate-100/50 hover:text-slate-950 hover:scale-[1.01]'
           }`}
         >
           <Cpu className="w-4 h-4" />
@@ -254,15 +298,20 @@ export default function CodePlayground({ topics, activeTopicId, onCodeRunSuccess
         </button>
 
         <button
-          onClick={() => setActivePlaygroundTab('pharma_library')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+          onClick={() => {
+            setActivePlaygroundTab('pharma_library');
+          }}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-extrabold transition-all duration-300 transform active:scale-95 cursor-pointer ${
             activePlaygroundTab === 'pharma_library'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-600/15'
+              : 'text-slate-600 hover:bg-slate-100/50 hover:text-slate-950 hover:scale-[1.01]'
           }`}
         >
           <Layers className="w-4 h-4 text-rose-500 animate-pulse" />
-          💊 Pharma Python Library
+          <span>💊 Pharma Python Library</span>
+          {(approvalStatus !== 'approved' || pharmaAllowed === false) && (
+            <span className="text-[10px] bg-rose-500 text-white px-1.5 py-0.5 rounded-md text-xs font-black leading-none">🔒</span>
+          )}
         </button>
       </div>
 
@@ -313,18 +362,51 @@ export default function CodePlayground({ topics, activeTopicId, onCodeRunSuccess
                 <Layers className="w-3.5 h-3.5" />
                 Pharmaceutical Python Lab Library:
               </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {PHARMA_PROGRAMS.map((prog) => (
-                  <button
-                    key={prog.id}
-                    onClick={() => handleSelectPharmaProgram(prog)}
-                    className="p-2.5 text-left border border-slate-200 hover:border-rose-400 bg-white rounded-xl hover:bg-rose-50/30 text-xs font-medium text-slate-700 transition-all shadow-sm flex flex-col cursor-pointer hover:shadow"
-                  >
-                    <span className="font-bold text-slate-800 truncate">{prog.name}</span>
-                    <span className="text-[10px] text-slate-400 mt-0.5">{prog.category}</span>
-                  </button>
-                ))}
-              </div>
+              {approvalStatus !== 'approved' || !pharmaAllowed ? (
+                <div className="bg-white/95 rounded-2xl p-4 border border-rose-200/50 text-center space-y-3 shadow-xs">
+                  <div className="w-10 h-10 bg-rose-50 border border-rose-100/70 rounded-xl flex items-center justify-center text-rose-500 mx-auto">
+                    <Lock className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-slate-800 text-xs">Pharma Library Locked 🔒</h5>
+                    <p className="text-[10px] text-slate-500 leading-relaxed mt-1 font-sans">
+                      {approvalStatus !== 'approved' 
+                        ? '"Beta, pharma library ke unique industrial codes (PK, Drug Formulation, posology) access karne ke liye approved status hona zaroori hai!"'
+                        : '"Beta, aapke account par Pharma Library access temporary disable kiya gaya hai. Kripya Pawan Sir se baat karein!"'}
+                    </p>
+                  </div>
+                  <div className="text-[9px] bg-amber-50 text-amber-700 font-extrabold px-2.5 py-1 rounded-lg border border-amber-100 inline-block uppercase tracking-wider font-sans">
+                    {approvalStatus !== 'approved' ? `Approval Status: ${approvalStatus}` : 'Permission Disabled 🔒'}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {PHARMA_PROGRAMS.map((prog) => {
+                    const isSelected = selectedPharmaProgId === prog.id;
+                    return (
+                      <button
+                        key={prog.id}
+                        onClick={() => {
+                          setSelectedPharmaProgId(prog.id);
+                          handleSelectPharmaProgram(prog);
+                        }}
+                        className={`p-2.5 text-left border rounded-xl text-xs font-medium transition-all shadow-sm flex flex-col cursor-pointer hover:shadow hover:scale-[1.01] ${
+                          isSelected
+                            ? 'border-rose-500 bg-rose-50/50 ring-1 ring-rose-500/20'
+                            : 'border-slate-200 hover:border-rose-400 bg-white text-slate-700'
+                        }`}
+                      >
+                        <span className={`font-bold truncate ${isSelected ? 'text-rose-950' : 'text-slate-800'}`}>
+                          {prog.name}
+                        </span>
+                        <span className={`text-[10px] mt-0.5 ${isSelected ? 'text-rose-600 font-semibold' : 'text-slate-400'}`}>
+                          {prog.category}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -348,6 +430,26 @@ export default function CodePlayground({ topics, activeTopicId, onCodeRunSuccess
 
           {/* Editor Area */}
           <div className="flex-1 relative font-mono text-sm">
+            {(approvalStatus !== 'approved' || pharmaAllowed === false) && activePlaygroundTab === 'pharma_library' && (
+              <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md z-10 flex flex-col items-center justify-center text-center p-6 space-y-4 animate-fadeIn">
+                <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-center justify-center text-rose-500 shadow-lg">
+                  <Lock className="w-8 h-8 animate-pulse" />
+                </div>
+                <div className="space-y-2 max-w-md">
+                  <h4 className="text-white font-extrabold text-sm tracking-tight flex items-center justify-center gap-1.5">
+                    Pharma Library Locked 🔒
+                  </h4>
+                  <p className="text-[11px] text-slate-300 leading-relaxed font-sans">
+                    {approvalStatus !== 'approved' 
+                      ? '"Beta, Pharma Library ke unique industrial codes (PK, Drug Formulation, posology) access karne ke liye approved status hona zaroori hai! Kripya Pawan Sir se connect karein."'
+                      : '"Beta, aapke account par Pharma Library access temporary disable kiya gaya hai. Kripya Pawan Sir se baat karein!"'}
+                  </p>
+                </div>
+                <div className="text-[9px] bg-amber-500/10 text-amber-400 font-extrabold px-3 py-1 rounded-lg border border-amber-500/20 uppercase tracking-wider font-sans">
+                  {approvalStatus !== 'approved' ? `Approval Status: ${approvalStatus}` : 'Permission Off 🔒'}
+                </div>
+              </div>
+            )}
             <div className="absolute left-0 top-0 bottom-0 w-11 bg-slate-900 border-r border-slate-800 text-slate-500 text-right pr-2.5 select-none font-mono text-[10px] sm:text-xs pt-4 leading-relaxed flex flex-col gap-0.5">
               {code.split('\n').map((_, i) => (
                 <div 
@@ -371,11 +473,11 @@ export default function CodePlayground({ topics, activeTopicId, onCodeRunSuccess
           </div>
 
           {/* Control bar */}
-          <div className="bg-slate-50 border-t border-slate-200/80 px-4 py-3.5 flex gap-2.5 flex-wrap">
+          <div className="bg-slate-50 border-t border-slate-200/60 px-4 py-3.5 flex gap-2.5 flex-wrap">
             <button
               onClick={handleRunCode}
               disabled={running}
-              className="flex items-center gap-1.5 px-4.5 py-2.5 bg-indigo-600 text-white text-xs font-extrabold rounded-xl hover:bg-indigo-700 active:scale-95 disabled:opacity-50 transition-all cursor-pointer shadow-md shadow-indigo-600/10"
+              className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-xs font-extrabold rounded-xl hover:shadow-lg hover:shadow-indigo-600/25 active:scale-95 hover:scale-[1.02] disabled:opacity-50 transition-all cursor-pointer shadow-md"
             >
               {running ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
               Run Script ⚡
@@ -384,16 +486,16 @@ export default function CodePlayground({ topics, activeTopicId, onCodeRunSuccess
             <button
               onClick={handleDebugCode}
               disabled={debugging}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-900 text-white text-xs font-extrabold rounded-xl hover:bg-black active:scale-95 disabled:opacity-50 transition-all cursor-pointer shadow-md"
+              className="flex items-center gap-2 px-5 py-3 bg-slate-900 text-white text-xs font-extrabold rounded-xl hover:bg-black hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all cursor-pointer shadow-md"
             >
-              {debugging ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Bug className="w-3.5 h-3.5" />}
+              {debugging ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Bug className="w-3.5 h-3.5 animate-pulse" />}
               AI Debug Code 🧪
             </button>
 
             <button
               onClick={handleExplainCode}
               disabled={explaining}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-extrabold rounded-xl hover:bg-indigo-100 active:scale-95 disabled:opacity-50 transition-all cursor-pointer shadow-sm"
+              className="flex items-center gap-2 px-5 py-3 bg-indigo-50/70 text-indigo-700 border border-indigo-100/60 text-xs font-extrabold rounded-xl hover:bg-indigo-100 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all cursor-pointer shadow-xs"
             >
               {explaining ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-indigo-600" />}
               Line-by-Line Guide
